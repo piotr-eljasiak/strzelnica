@@ -32,6 +32,10 @@ Trzy procesy wstają razem:
 
 Konto testowe: `strzelec@example.com` / `strzelec123`.
 
+> **Windows PowerShell:** jeśli `npm` kończy się błędem `running scripts is disabled on
+> this system`, użyj `npm.cmd` zamiast `npm` — albo pomiń npm i uruchom wprost
+> `node tools/dev.js`. Nie trzeba zmieniać polityki wykonywania skryptów.
+
 Widget i aplikacja stoją na różnych portach **celowo**: tylko wtedy ramka jest naprawdę
 kontekstem third-party i test osadzenia coś znaczy.
 

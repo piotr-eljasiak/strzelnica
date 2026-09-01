@@ -17,7 +17,10 @@ const RESET = '\x1b[0m';
 const children = [];
 
 for (const part of parts) {
-  const child = spawn(process.execPath, part.args, { stdio: ['ignore', 'pipe', 'pipe'] });
+  // stdin is inherited, not ignored: Vite watches stdin for its keyboard shortcuts and
+  // shuts down when it sees the stream end straight away -- which then took the other two
+  // processes down with it.
+  const child = spawn(process.execPath, part.args, { stdio: ['inherit', 'pipe', 'pipe'] });
   children.push(child);
 
   for (const stream of [child.stdout, child.stderr]) {

@@ -36,8 +36,8 @@ export function HomePage() {
       </div>
 
       <p className="muted">
-        Widget osadzony na stronie strzelnicy działa pod adresem{' '}
-        <code>http://localhost:5174</code> (uruchom <code>npm run dev:host</code>).
+        Widget osadzony na prawdziwej stronie strzelnicy zobaczysz pod adresem{' '}
+        <a href="http://localhost:5174">http://localhost:5174</a> — tam zaczyna klient.
       </p>
     </div>
   );

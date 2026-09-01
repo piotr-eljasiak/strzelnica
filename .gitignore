@@ -1,0 +1,27 @@
+# Zależności
+node_modules/
+
+# Build
+dist/
+build/
+
+# Lokalna baza SQLite (ADR 0004) — dane testowe nie należą do repozytorium
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Konfiguracja lokalna i sekrety
+.env
+.env.local
+.env.*.local
+
+# Logi
+*.log
+npm-debug.log*
+
+# Narzędzia i system
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

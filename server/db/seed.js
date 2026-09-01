@@ -16,6 +16,7 @@ const SATURDAY = 6;
 const WEEKDAYS = [1, 2, 3, 4, 5];
 
 const DEMO_PASSWORD = 'strzelec123';
+const STAFF_PASSWORD = 'obsluga123';
 
 export function seed(db) {
   const now = new Date().toISOString();
@@ -103,7 +104,7 @@ export function seed(db) {
     'Zawody klubowe',
   );
 
-  // --- Demo account ---
+  // --- Demo accounts ---
 
   insertShooter.run(
     'strzelec@example.com',
@@ -114,10 +115,25 @@ export function seed(db) {
     now,
   );
 
+  // One staff account per range, so tests and manual poking can prove that staff of one
+  // range cannot reach the other (ADR 0001).
+  const insertStaff = db.prepare(`
+    INSERT INTO staff (range_id, email, password_hash, name, created_utc)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+  const staffHash = hashPassword(STAFF_PASSWORD);
+  insertStaff.run(tarczownia, 'obsluga@tarczownia.example', staffHash, 'Ewa Wójcik', now);
+  insertStaff.run(bemowo, 'obsluga@bemowo.example', staffHash, 'Piotr Zieliński', now);
+
   return {
     ranges: ['tarczownia', 'bemowo'],
     lanes: 4,
     demoShooter: { email: 'strzelec@example.com', password: DEMO_PASSWORD },
+    demoStaff: {
+      tarczownia: 'obsluga@tarczownia.example',
+      bemowo: 'obsluga@bemowo.example',
+      password: STAFF_PASSWORD,
+    },
     closure: `Oś 50 m (Bemowo), ${saturday} 08:00-14:00 UTC`,
     inheritance: 'Oś 25 m (Tarczownia) inherits range hours; Oś 100 m has its own schedule',
   };

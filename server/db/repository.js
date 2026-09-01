@@ -21,6 +21,7 @@ export class SlotTakenError extends Error {
 export function createRepository(db) {
   const q = {
     rangeBySlug: db.prepare('SELECT * FROM shooting_range WHERE slug = ?'),
+    rangeById: db.prepare('SELECT * FROM shooting_range WHERE id = ?'),
     lanesOfRange: db.prepare(
       'SELECT * FROM lane WHERE range_id = ? ORDER BY distance_m, name',
     ),
@@ -94,11 +95,96 @@ export function createRepository(db) {
       UPDATE booking SET status = 'cancelled', cancelled_utc = ?
        WHERE id = ? AND status = 'confirmed'
     `),
+    markCancelledByStaff: db.prepare(`
+      UPDATE booking
+         SET status = 'cancelled', cancelled_utc = ?,
+             cancelled_by_staff_id = ?, cancellation_note = ?
+       WHERE id = ? AND status = 'confirmed'
+    `),
     deleteBookedSlots: db.prepare('DELETE FROM booked_slot WHERE booking_id = ?'),
+
+    // --- Staff and the panel ---
+
+    staffByEmail: db.prepare('SELECT * FROM staff WHERE email = ?'),
+    staffById: db.prepare('SELECT * FROM staff WHERE id = ?'),
+    insertStaff: db.prepare(`
+      INSERT INTO staff (range_id, email, password_hash, name, created_utc)
+      VALUES (?, ?, ?, ?, ?)
+    `),
+    insertRange: db.prepare(`
+      INSERT INTO shooting_range (slug, name, phone, time_zone)
+      VALUES (?, ?, ?, ?)
+    `),
+    allRanges: db.prepare('SELECT * FROM shooting_range ORDER BY name'),
+    insertLane: db.prepare(
+      'INSERT INTO lane (range_id, name, distance_m) VALUES (?, ?, ?)',
+    ),
+    updateLane: db.prepare(
+      'UPDATE lane SET name = ?, distance_m = ? WHERE id = ? AND range_id = ?',
+    ),
+    deleteLane: db.prepare('DELETE FROM lane WHERE id = ? AND range_id = ?'),
+    laneHasBookings: db.prepare(`
+      SELECT COUNT(*) AS n FROM booking
+       WHERE lane_id = ? AND status = 'confirmed' AND end_utc > ?
+    `),
+    clearLaneHours: db.prepare('DELETE FROM lane_hours WHERE lane_id = ?'),
+    insertLaneHours: db.prepare(`
+      INSERT INTO lane_hours (lane_id, weekday, start_hour, end_hour) VALUES (?, ?, ?, ?)
+    `),
+    clearRangeHours: db.prepare('DELETE FROM range_hours WHERE range_id = ?'),
+    insertRangeHours: db.prepare(`
+      INSERT INTO range_hours (range_id, weekday, start_hour, end_hour) VALUES (?, ?, ?, ?)
+    `),
+    insertClosure: db.prepare(
+      'INSERT INTO closure (lane_id, start_utc, end_utc, reason) VALUES (?, ?, ?, ?)',
+    ),
+    closureById: db.prepare(`
+      SELECT c.* FROM closure c JOIN lane l ON l.id = c.lane_id
+       WHERE c.id = ? AND l.range_id = ?
+    `),
+    deleteClosure: db.prepare('DELETE FROM closure WHERE id = ?'),
+    closuresOfRange: db.prepare(`
+      SELECT c.*, l.name AS lane_name
+        FROM closure c JOIN lane l ON l.id = c.lane_id
+       WHERE l.range_id = ? AND c.end_utc > ?
+       ORDER BY c.start_utc
+    `),
+    /** Bookings of one range, with the shooter's contact details -- staff need to call. */
+    bookingsOfRange: db.prepare(`
+      SELECT b.*, l.name AS lane_name, l.distance_m,
+             r.name AS range_name, r.slug AS range_slug, r.phone AS range_phone,
+             r.time_zone, r.cancellation_window_hours,
+             s.first_name, s.last_name, s.phone AS shooter_phone, s.email AS shooter_email
+        FROM booking b
+        JOIN lane l           ON l.id = b.lane_id
+        JOIN shooting_range r ON r.id = b.range_id
+        JOIN shooter s        ON s.id = b.shooter_id
+       WHERE b.range_id = ? AND b.end_utc > ?
+       ORDER BY b.start_utc
+    `),
+    /** Confirmed bookings a proposed closure would collide with. */
+    bookingsCollidingWith: db.prepare(`
+      SELECT b.*, l.name AS lane_name, s.first_name, s.last_name,
+             s.phone AS shooter_phone, s.email AS shooter_email
+        FROM booking b
+        JOIN lane l    ON l.id = b.lane_id
+        JOIN shooter s ON s.id = b.shooter_id
+       WHERE b.lane_id = ? AND b.status = 'confirmed'
+         AND b.start_utc < ? AND b.end_utc > ?
+       ORDER BY b.start_utc
+    `),
+    updateRangeSettings: db.prepare(`
+      UPDATE shooting_range
+         SET phone = ?, horizon_days = ?, max_active_bookings = ?,
+             max_slots_per_day = ?, cancellation_window_hours = ?
+       WHERE id = ?
+    `),
   };
 
   return {
     rangeBySlug: (slug) => q.rangeBySlug.get(slug),
+    rangeById: (id) => q.rangeById.get(id),
+    rangeHours: (rangeId) => q.rangeHours.all(rangeId),
     lanesOfRange: (rangeId) => q.lanesOfRange.all(rangeId),
     laneInRange: (laneId, rangeId) => q.laneInRange.get(laneId, rangeId),
     embedOrigins: (rangeId) => q.embedOrigins.all(rangeId).map((r) => r.origin),
@@ -172,10 +258,12 @@ export function createRepository(db) {
     },
 
     /** Cancels a booking and frees its slots. Returns false if it was already cancelled. */
-    cancelBooking(bookingId, nowUtc) {
+    cancelBooking(bookingId, nowUtc, by = null) {
       db.exec('BEGIN IMMEDIATE');
       try {
-        const result = q.markCancelled.run(nowUtc, bookingId);
+        const result = by
+          ? q.markCancelledByStaff.run(nowUtc, by.staffId, by.note ?? null, bookingId)
+          : q.markCancelled.run(nowUtc, bookingId);
         if (result.changes === 0) {
           db.exec('ROLLBACK');
           return false;
@@ -187,6 +275,77 @@ export function createRepository(db) {
         db.exec('ROLLBACK');
         throw error;
       }
+    },
+
+    // --- Staff and the panel ---
+
+    staffByEmail: (email) => q.staffByEmail.get(email),
+    staffById: (id) => q.staffById.get(id),
+    insertStaff({ rangeId, email, passwordHash, name, nowUtc }) {
+      const result = q.insertStaff.run(rangeId, email, passwordHash, name, nowUtc);
+      return q.staffById.get(result.lastInsertRowid);
+    },
+
+    allRanges: () => q.allRanges.all(),
+    insertRange({ slug, name, phone, timeZone = 'Europe/Warsaw' }) {
+      q.insertRange.run(slug, name, phone, timeZone);
+      return q.rangeBySlug.get(slug);
+    },
+
+    addLane: (rangeId, name, distanceM) => q.insertLane.run(rangeId, name, distanceM).lastInsertRowid,
+    updateLane: (laneId, rangeId, name, distanceM) =>
+      q.updateLane.run(name, distanceM, laneId, rangeId).changes > 0,
+    removeLane: (laneId, rangeId) => q.deleteLane.run(laneId, rangeId).changes > 0,
+    laneHasFutureBookings: (laneId, nowUtc) => q.laneHasBookings.get(laneId, nowUtc).n > 0,
+
+    /** Replaces a lane's whole week at once; an empty list restores inheritance. */
+    replaceLaneHours(laneId, days) {
+      db.exec('BEGIN IMMEDIATE');
+      try {
+        q.clearLaneHours.run(laneId);
+        for (const day of days) {
+          q.insertLaneHours.run(laneId, day.weekday, day.startHour, day.endHour);
+        }
+        db.exec('COMMIT');
+      } catch (error) {
+        db.exec('ROLLBACK');
+        throw error;
+      }
+    },
+
+    replaceRangeHours(rangeId, days) {
+      db.exec('BEGIN IMMEDIATE');
+      try {
+        q.clearRangeHours.run(rangeId);
+        for (const day of days) {
+          q.insertRangeHours.run(rangeId, day.weekday, day.startHour, day.endHour);
+        }
+        db.exec('COMMIT');
+      } catch (error) {
+        db.exec('ROLLBACK');
+        throw error;
+      }
+    },
+
+    addClosure: (laneId, startUtc, endUtc, reason) =>
+      q.insertClosure.run(laneId, startUtc, endUtc, reason).lastInsertRowid,
+    closureInRange: (closureId, rangeId) => q.closureById.get(closureId, rangeId),
+    removeClosure: (closureId) => q.deleteClosure.run(closureId).changes > 0,
+    closuresOfRange: (rangeId, nowUtc) => q.closuresOfRange.all(rangeId, nowUtc),
+
+    bookingsOfRange: (rangeId, nowUtc) => q.bookingsOfRange.all(rangeId, nowUtc),
+    bookingsCollidingWith: (laneId, startUtc, endUtc) =>
+      q.bookingsCollidingWith.all(laneId, endUtc, startUtc),
+
+    updateRangeSettings(rangeId, settings) {
+      q.updateRangeSettings.run(
+        settings.phone,
+        settings.horizonDays,
+        settings.maxActiveBookings,
+        settings.maxSlotsPerDay,
+        settings.cancellationWindowHours,
+        rangeId,
+      );
     },
   };
 }

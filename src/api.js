@@ -40,6 +40,24 @@ export const api = {
   cancel: (id) => request('POST', `/bookings/${id}/cancel`, {}),
 };
 
+/** The range staff's side. A separate session and a separate cookie (ADR 0008). */
+export const panelApi = {
+  login: (fields) => request('POST', '/panel/login', fields),
+  logout: () => request('POST', '/panel/logout', {}),
+  overview: () => request('GET', '/panel'),
+  addLane: (fields) => request('POST', '/panel/lanes', fields),
+  editLane: (id, fields) => request('POST', `/panel/lanes/${id}`, fields),
+  removeLane: (id) => request('POST', `/panel/lanes/${id}/delete`, {}),
+  setLaneHours: (id, days) => request('POST', `/panel/lanes/${id}/hours`, { days }),
+  setRangeHours: (days) => request('POST', '/panel/hours', { days }),
+  setSettings: (fields) => request('POST', '/panel/settings', fields),
+  closures: () => request('GET', '/panel/closures'),
+  addClosure: (fields) => request('POST', '/panel/closures', fields),
+  removeClosure: (id) => request('POST', `/panel/closures/${id}/delete`, {}),
+  bookings: () => request('GET', '/panel/bookings'),
+  cancelBooking: (id, note) => request('POST', `/panel/bookings/${id}/cancel`, { note }),
+};
+
 /** Refusals the API can return, in Polish, for the shooter to read. */
 export const REFUSAL_TEXT = {
   slot_taken: 'Ten termin został właśnie zajęty. Wybierz inny.',
@@ -58,6 +76,10 @@ export const REFUSAL_TEXT = {
   missing_fields: 'Wypełnij wszystkie pola.',
   unauthenticated: 'Zaloguj się, aby kontynuować.',
   not_found: 'Nie znaleziono.',
+  lane_name_taken: 'Oś o tej nazwie już istnieje.',
+  lane_has_bookings: 'Na tę oś są rezerwacje — nie da się jej usunąć.',
+  closure_collides: 'Blokada obejmuje istniejące rezerwacje.',
+  invalid_hours: 'Godziny są nieprawidłowe: koniec musi być po początku.',
 };
 
 export const refusalText = (error) =>

@@ -28,9 +28,29 @@ Trzy procesy wstają razem:
 | --- | --- |
 | http://localhost:5174 | udawana strona strzelnicy z **osadzonym widgetem** — zacznij tutaj |
 | http://localhost:5173 | aplikacja: finalizacja rezerwacji, moje rezerwacje |
+| http://localhost:5173/panel | panel obsługi strzelnicy |
 | http://localhost:3000 | API |
 
-Konto testowe: `strzelec@example.com` / `strzelec123`.
+Konta testowe:
+
+| Rola | Login | Hasło |
+| --- | --- | --- |
+| Strzelec | `strzelec@example.com` | `strzelec123` |
+| Obsługa Tarczowni | `obsluga@tarczownia.example` | `obsluga123` |
+| Obsługa Bemowa | `obsluga@bemowo.example` | `obsluga123` |
+
+Konto strzelca i konto obsługi to osobne byty z osobnymi sesjami
+([ADR 0008](docs/adr/0008-obsluga-jako-osobny-byt.md)) — można być zalogowanym w obu naraz.
+
+## Admin platformy
+
+Strzelnice i konta obsługi zakłada się z linii poleceń, nie przez interfejs:
+
+```bash
+node tools/admin.js
+```
+
+Komendy: `list`, `add-range`, `add-staff`, `allow-origin <slug> <url>`.
 
 > **Windows PowerShell:** jeśli `npm` kończy się błędem `running scripts is disabled on
 > this system`, użyj `npm.cmd` zamiast `npm` — albo pomiń npm i uruchom wprost

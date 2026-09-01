@@ -37,3 +37,16 @@ export function addDays(date, days) {
   const [year, month, day] = date.split('-').map(Number);
   return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
 }
+
+/**
+ * Polish plurals: 1 rezerwację, 2 rezerwacje, 5 rezerwacji.
+ * Three forms, not two -- picking the wrong one is the sort of thing that makes an
+ * interface read as machine-translated.
+ */
+export function plural(count, one, few, many) {
+  const last = count % 10;
+  const lastTwo = count % 100;
+  if (count === 1) return one;
+  if (last >= 2 && last <= 4 && (lastTwo < 12 || lastTwo > 14)) return few;
+  return many;
+}

@@ -3,25 +3,31 @@ import { randomBytes } from 'node:crypto';
 /**
  * Sessions held in the process, keyed by an opaque cookie value.
  *
- * They vanish when the server restarts, which is the right trade for a local test app and
- * keeps the store out of the schema. The cookie is HttpOnly and SameSite=Lax: it is
- * deliberately NOT sent from inside a third-party frame, which is exactly why the widget
- * finishes a booking by leaving the frame rather than posting from inside it (ADR 0002).
+ * Shooters and staff get different cookies, not different values of one cookie (ADR 0008).
+ * A staff cookie can never be mistaken for a shooter's, and one person can be signed into
+ * both at once without either session standing in for the other.
+ *
+ * Both cookies are HttpOnly and SameSite=Lax, so neither travels from inside a
+ * third-party frame -- which is exactly why booking is finished outside the widget
+ * (ADR 0002).
  */
 
-export const COOKIE_NAME = 'sid';
+export const SHOOTER_COOKIE = 'sid';
+export const STAFF_COOKIE = 'psid';
 
 export function createSessions() {
   const byToken = new Map();
 
   return {
-    open(shooterId) {
+    open(kind, id) {
       const token = randomBytes(24).toString('base64url');
-      byToken.set(token, shooterId);
+      byToken.set(token, { kind, id });
       return token;
     },
-    shooterIdFor(token) {
-      return token ? byToken.get(token) : undefined;
+    /** Returns the id only when the session is of the kind being asked about. */
+    idFor(kind, token) {
+      const session = token ? byToken.get(token) : undefined;
+      return session?.kind === kind ? session.id : undefined;
     },
     close(token) {
       byToken.delete(token);
@@ -38,8 +44,8 @@ export function readCookie(header, name) {
   return undefined;
 }
 
-export function sessionCookie(token) {
-  return `${COOKIE_NAME}=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=86400`;
-}
+export const sessionCookie = (name, token) =>
+  `${name}=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=86400`;
 
-export const clearedCookie = `${COOKIE_NAME}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`;
+export const clearedCookie = (name) =>
+  `${name}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`;

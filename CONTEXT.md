@@ -65,3 +65,13 @@ _Unikaj_: superadmin, root, właściciel
 **Instruktor**:
 Świadomie **poza modelem**. Nadzór instruktorski, patenty i wypożyczanie broni pozostają poza
 platformą i nie wpływają na dostępność osi.
+
+**Konto obsługi**:
+Dostęp obsługi do panelu jednej strzelnicy. Odrębne od konta strzelca: ta sama osoba
+potrzebuje obu, jeśli chce i pracować, i strzelać.
+_Unikaj_: konto pracownika, rola, uprawnienia
+
+**Panel**:
+Interfejs, w którym obsługa zarządza osiami, grafikiem, blokadami i rezerwacjami swojej
+strzelnicy.
+_Unikaj_: admin, backoffice, kokpit

@@ -2,29 +2,44 @@ import { createServer } from 'node:http';
 
 import { createRepository } from '../db/repository.js';
 import { NotFound, Refused, createService } from '../app/service.js';
-import { COOKIE_NAME, clearedCookie, createSessions, readCookie, sessionCookie } from './sessions.js';
+import { createPanelService } from '../app/panel-service.js';
+import {
+  SHOOTER_COOKIE,
+  STAFF_COOKIE,
+  clearedCookie,
+  createSessions,
+  readCookie,
+  sessionCookie,
+} from './sessions.js';
 
 /**
- * The HTTP layer: authenticate, route, call the service, map the answer onto a status
- * code. No domain logic lives here -- if a rule ever needs changing, this file should not
- * be the one that changes.
+ * The HTTP layer: authenticate, route, call a service, map the answer onto a status code.
+ * No domain logic lives here -- if a rule needs changing, this file should not change.
  *
- * `now` is injected rather than read from the clock so the tests can place themselves at
- * a fixed moment (see the spec's testing decisions).
+ * `now` is injected rather than read from the clock so tests can place themselves at a
+ * fixed moment (see the spec's testing decisions).
  */
 
 const REFUSAL_STATUS = {
   slot_taken: 409,
   email_taken: 409,
+  lane_name_taken: 409,
+  closure_collides: 409,
+  lane_has_bookings: 409,
   bad_credentials: 401,
   missing_fields: 400,
+  invalid_hours: 400,
 };
 
 export function createApp({ db, now = () => Date.now() }) {
-  const service = createService({ repository: createRepository(db), now });
+  const repository = createRepository(db);
+  const service = createService({ repository, now });
+  const panel = createPanelService({ repository, now });
   const sessions = createSessions();
 
   const routes = [
+    // --- Public ---
+
     ['GET', /^\/api\/ranges\/([\w-]+)$/, (ctx, slug) => ok(service.rangeSummary(slug))],
 
     ['GET', /^\/api\/ranges\/([\w-]+)\/availability$/, (ctx, slug) =>
@@ -38,19 +53,21 @@ export function createApp({ db, now = () => Date.now() }) {
       ok(service.embedOrigins(slug)),
     ],
 
+    // --- Shooter ---
+
     ['POST', /^\/api\/auth\/register$/, (ctx) => {
       const shooter = service.register(ctx.body);
-      return withSession(sessions.open(shooter.id), ok(presentShooter(shooter), 201));
+      return cookie(SHOOTER_COOKIE, sessions.open('shooter', shooter.id), ok(presentShooter(shooter), 201));
     }],
 
     ['POST', /^\/api\/auth\/login$/, (ctx) => {
       const shooter = service.authenticate(ctx.body);
-      return withSession(sessions.open(shooter.id), ok(presentShooter(shooter)));
+      return cookie(SHOOTER_COOKIE, sessions.open('shooter', shooter.id), ok(presentShooter(shooter)));
     }],
 
     ['POST', /^\/api\/auth\/logout$/, (ctx) => {
-      sessions.close(ctx.token);
-      return { status: 204, headers: { 'Set-Cookie': clearedCookie } };
+      sessions.close(ctx.shooterToken);
+      return { status: 204, headers: { 'Set-Cookie': clearedCookie(SHOOTER_COOKIE) } };
     }],
 
     ['GET', /^\/api\/auth\/me$/, (ctx) => ok(presentShooter(requireShooter(ctx)))],
@@ -75,11 +92,82 @@ export function createApp({ db, now = () => Date.now() }) {
     ['POST', /^\/api\/bookings\/(\d+)\/cancel$/, (ctx, id) =>
       ok(service.cancel({ bookingId: Number(id), shooterId: requireShooter(ctx).id })),
     ],
+
+    // --- Panel (range staff) ---
+
+    ['POST', /^\/api\/panel\/login$/, (ctx) => {
+      const staff = panel.authenticate(ctx.body);
+      return cookie(STAFF_COOKIE, sessions.open('staff', staff.id), ok(panel.overview(staff)));
+    }],
+
+    ['POST', /^\/api\/panel\/logout$/, (ctx) => {
+      sessions.close(ctx.staffToken);
+      return { status: 204, headers: { 'Set-Cookie': clearedCookie(STAFF_COOKIE) } };
+    }],
+
+    ['GET', /^\/api\/panel$/, (ctx) => ok(panel.overview(requireStaff(ctx)))],
+
+    ['POST', /^\/api\/panel\/lanes$/, (ctx) => {
+      const id = panel.addLane(requireStaff(ctx), ctx.body);
+      return ok({ id }, 201);
+    }],
+
+    ['POST', /^\/api\/panel\/lanes\/(\d+)$/, (ctx, id) => {
+      panel.renameLane(requireStaff(ctx), Number(id), ctx.body);
+      return { status: 204 };
+    }],
+
+    ['POST', /^\/api\/panel\/lanes\/(\d+)\/delete$/, (ctx, id) => {
+      panel.removeLane(requireStaff(ctx), Number(id));
+      return { status: 204 };
+    }],
+
+    ['POST', /^\/api\/panel\/lanes\/(\d+)\/hours$/, (ctx, id) => {
+      panel.setLaneHours(requireStaff(ctx), Number(id), ctx.body.days);
+      return { status: 204 };
+    }],
+
+    ['POST', /^\/api\/panel\/hours$/, (ctx) => {
+      panel.setRangeHours(requireStaff(ctx), ctx.body.days);
+      return { status: 204 };
+    }],
+
+    ['POST', /^\/api\/panel\/settings$/, (ctx) => {
+      panel.setRangeSettings(requireStaff(ctx), ctx.body);
+      return { status: 204 };
+    }],
+
+    ['GET', /^\/api\/panel\/closures$/, (ctx) =>
+      ok({ closures: panel.closures(requireStaff(ctx)) }),
+    ],
+
+    ['POST', /^\/api\/panel\/closures$/, (ctx) =>
+      ok(panel.addClosure(requireStaff(ctx), ctx.body), 201),
+    ],
+
+    ['POST', /^\/api\/panel\/closures\/(\d+)\/delete$/, (ctx, id) => {
+      panel.removeClosure(requireStaff(ctx), Number(id));
+      return { status: 204 };
+    }],
+
+    ['GET', /^\/api\/panel\/bookings$/, (ctx) =>
+      ok({ bookings: panel.bookings(requireStaff(ctx)) }),
+    ],
+
+    ['POST', /^\/api\/panel\/bookings\/(\d+)\/cancel$/, (ctx, id) => {
+      panel.cancelBooking(requireStaff(ctx), Number(id), ctx.body.note);
+      return { status: 204 };
+    }],
   ];
 
   function requireShooter(ctx) {
     if (!ctx.shooter) throw new Unauthorised();
     return ctx.shooter;
+  }
+
+  function requireStaff(ctx) {
+    if (!ctx.staff) throw new Unauthorised();
+    return ctx.staff;
   }
 
   const handler = async (req, res) => {
@@ -92,13 +180,18 @@ export function createApp({ db, now = () => Date.now() }) {
       if (!route) {
         outcome = { status: 404, body: { error: 'not_found' } };
       } else {
-        const token = readCookie(req.headers.cookie, COOKIE_NAME);
-        const shooterId = sessions.shooterIdFor(token);
+        const shooterToken = readCookie(req.headers.cookie, SHOOTER_COOKIE);
+        const staffToken = readCookie(req.headers.cookie, STAFF_COOKIE);
+        const shooterId = sessions.idFor('shooter', shooterToken);
+        const staffId = sessions.idFor('staff', staffToken);
+
         const ctx = {
           query: url.searchParams,
           body: req.method === 'POST' ? await readJson(req) : {},
-          token,
+          shooterToken,
+          staffToken,
           shooter: shooterId ? service.shooterById(shooterId) : undefined,
+          staff: staffId ? panel.staffById(staffId) : undefined,
         };
         outcome = await route[2](ctx, ...url.pathname.match(route[1]).slice(1));
       }
@@ -131,9 +224,9 @@ function mapError(error) {
 }
 
 const ok = (body, status = 200) => ({ status, body });
-const withSession = (token, outcome) => ({
+const cookie = (name, token, outcome) => ({
   ...outcome,
-  headers: { ...outcome.headers, 'Set-Cookie': sessionCookie(token) },
+  headers: { ...outcome.headers, 'Set-Cookie': sessionCookie(name, token) },
 });
 
 const presentShooter = (shooter) => ({

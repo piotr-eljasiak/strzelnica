@@ -159,3 +159,21 @@ input {
 /* Widget: no page chrome, no margins -- it lives inside someone else's layout. */
 .widget { padding: 0.5rem; }
 .widget .lane { margin-bottom: 1rem; }
+
+/* Panel */
+table.hours { border-collapse: collapse; margin-bottom: 0.75rem; }
+table.hours td { padding: 0.2rem 0.75rem 0.2rem 0; vertical-align: middle; }
+.hours-day { font-size: 0.875rem; width: 8rem; }
+.hours-range { display: inline-flex; align-items: center; gap: 0.4rem; }
+.hours-range input { width: 4rem; }
+label.inline { display: inline-flex; flex-direction: row; align-items: center; gap: 0.35rem; }
+select { font: inherit; padding: 0.45rem 0.6rem; border: 1px solid var(--line); border-radius: 0.35rem; }
+pre.snippet {
+  background: var(--sunk);
+  border: 1px solid var(--line);
+  border-radius: 0.35rem;
+  padding: 0.75rem;
+  overflow-x: auto;
+  font-size: 0.8rem;
+}
+.notice ul { margin: 0.5rem 0; padding-left: 1.25rem; font-size: 0.875rem; }

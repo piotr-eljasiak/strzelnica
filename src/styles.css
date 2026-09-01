@@ -177,3 +177,13 @@ pre.snippet {
   font-size: 0.8rem;
 }
 .notice ul { margin: 0.5rem 0; padding-left: 1.25rem; font-size: 0.875rem; }
+
+.paging {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--line);
+}

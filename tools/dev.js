@@ -8,7 +8,10 @@
 import { spawn } from 'node:child_process';
 
 const parts = [
-  { name: 'api  ', args: ['server/http/server.js'], colour: '\x1b[36m' },
+  // --watch, because Vite reloads the browser on every edit but Node does not reload
+  // itself. Without it the front end runs new code against an old API, and the mismatch
+  // looks like a bug in the page rather than a stale process.
+  { name: 'api  ', args: ['--watch', 'server/http/server.js'], colour: '\x1b[36m' },
   { name: 'web  ', args: ['node_modules/vite/bin/vite.js'], colour: '\x1b[35m' },
   { name: 'host ', args: ['tools/host-site.js'], colour: '\x1b[33m' },
 ];

@@ -169,3 +169,53 @@ describe('Dostępność osi', () => {
     }
   });
 });
+
+describe('Horyzont i stronicowanie dostępności', () => {
+  let server;
+  let client;
+
+  before(async () => {
+    server = await startTestServer();
+    client = server.client;
+  });
+  after(() => server.stop());
+
+  it('podaje granice okna rezerwacji, żeby interfejs wiedział, dokąd może przewijać', async () => {
+    const { body } = await client.get('/api/ranges/tarczownia/availability');
+
+    assert.equal(body.earliestDate, '2026-09-02', 'okno powinno zaczynać się dziś');
+    assert.equal(body.latestDate, '2026-10-02', 'Tarczownia ma horyzont 30 dni');
+  });
+
+  it('okno kończy się wcześniej w strzelnicy o krótszym horyzoncie', async () => {
+    const { body } = await client.get('/api/ranges/bemowo/availability');
+
+    assert.equal(body.latestDate, '2026-09-16', 'Bemowo ma horyzont 14 dni');
+  });
+
+  it('wydaje terminy w drugim i czwartym tygodniu, nie tylko w pierwszym', async () => {
+    const drugiTydzien = await client.get(
+      '/api/ranges/tarczownia/availability?from=2026-09-09&to=2026-09-15',
+    );
+    const czwartyTydzien = await client.get(
+      '/api/ranges/tarczownia/availability?from=2026-09-23&to=2026-09-29',
+    );
+
+    const wolne = (odpowiedz) =>
+      odpowiedz.body.lanes
+        .flatMap((lane) => lane.days.flatMap((day) => day.slots))
+        .filter((slot) => slot.state === 'free').length;
+
+    assert.ok(wolne(drugiTydzien) > 0, 'drugi tydzień jest pusty');
+    assert.ok(wolne(czwartyTydzien) > 0, 'czwarty tydzień jest pusty');
+  });
+
+  it('przycina żądanie wykraczające poza horyzont zamiast zwracać błąd', async () => {
+    const { status, body } = await client.get(
+      '/api/ranges/tarczownia/availability?from=2026-12-01&to=2026-12-07',
+    );
+
+    assert.equal(status, 200);
+    assert.equal(body.to, body.latestDate, 'zakres nie został przycięty do horyzontu');
+  });
+});

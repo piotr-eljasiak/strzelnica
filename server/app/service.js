@@ -83,6 +83,10 @@ export function createService({ repository, now }) {
         range: { slug: range.slug, name: range.name, timeZone: range.time_zone },
         from: start,
         to: end,
+        // The whole window a shooter may book in, so the interface knows how far it may
+        // page without asking for days the server would only clamp away (story 6 and 7).
+        earliestDate: window.from,
+        latestDate: window.to,
         lanes: repository.lanesOfRange(range.id).map((lane) => {
           const fromUtc = `${start}T00:00:00Z`;
           const toUtc = `${addDays(end, 2)}T00:00:00Z`;

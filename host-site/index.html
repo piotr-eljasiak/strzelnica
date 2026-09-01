@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Strzelnica Tarczownia</title>
+    <style>
+      :root { font-family: Georgia, 'Times New Roman', serif; color: #241d16; }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: #f7f4ef; }
+      header { background: #241d16; color: #f7f4ef; padding: 1.5rem 1rem; }
+      header div { max-width: 60rem; margin: 0 auto; }
+      header h1 { margin: 0; font-size: 1.6rem; letter-spacing: 0.02em; }
+      header p { margin: 0.25rem 0 0; opacity: 0.75; font-size: 0.9rem; }
+      nav { background: #3b2f24; color: #f7f4ef; font-size: 0.85rem; }
+      nav div { max-width: 60rem; margin: 0 auto; padding: 0.6rem 1rem; display: flex; gap: 1.5rem; }
+      main { max-width: 60rem; margin: 0 auto; padding: 2rem 1rem 4rem; }
+      h2 { font-size: 1.2rem; border-bottom: 1px solid #d8d0c4; padding-bottom: 0.4rem; }
+      .frame-box { background: #fff; border: 1px solid #d8d0c4; border-radius: 4px; padding: 0.5rem; }
+      iframe { width: 100%; border: 0; display: block; }
+      footer { max-width: 60rem; margin: 0 auto; padding: 1rem; font-size: 0.8rem; color: #6b6155; }
+    </style>
+  </head>
+  <body>
+    <!--
+      Udawana witryna strzelnicy. Istnieje po to, żeby widget był ładowany z INNEGO
+      źródła (port 5174) niż aplikacja (port 5173) -- czyli dokładnie tak, jak u
+      prawdziwego klienta. Osadzenie na tym samym porcie testowałoby wygląd, nie działanie.
+    -->
+    <header>
+      <div>
+        <h1>Strzelnica Tarczownia</h1>
+        <p>Gdynia &middot; oś 25 m &middot; oś 100 m</p>
+      </div>
+    </header>
+
+    <nav>
+      <div><span>Aktualności</span><span>Cennik</span><span>Rezerwacje</span><span>Kontakt</span></div>
+    </nav>
+
+    <main>
+      <h2>Rezerwacja osi</h2>
+      <p>Wybierz wolny termin. Rezerwację potwierdzisz w systemie rezerwacyjnym.</p>
+
+      <div class="frame-box">
+        <iframe
+          id="rezerwacje"
+          src="http://localhost:5173/w/tarczownia?embed=1"
+          title="Kalendarz rezerwacji"
+          height="400"
+        ></iframe>
+      </div>
+
+      <footer>To jest lokalna strona testowa, nie prawdziwa witryna strzelnicy.</footer>
+    </main>
+
+    <script>
+      // Widget zna swoją wysokość, ta strona nie. Bez tego ramka miałaby własny pasek
+      // przewijania i wyglądałaby jak wklejony obcy element (historia 35).
+      window.addEventListener('message', (event) => {
+        if (event.origin !== 'http://localhost:5173') return;
+        if (event.data?.type !== 'strzelnica:height') return;
+        document.getElementById('rezerwacje').height = event.data.height + 8;
+      });
+    </script>
+  </body>
+</html>

@@ -130,6 +130,15 @@ export function createService({ repository, now }) {
       return shooter;
     },
 
+    /**
+     * Which sites this range allows to embed its widget. Read by whatever serves the
+     * widget so it can set frame-ancestors from data rather than from a hard-coded list
+     * (story 36).
+     */
+    embedOrigins(slug) {
+      return { origins: repository.embedOrigins(requireRange(slug).id) };
+    },
+
     shooterById(id) {
       return repository.shooterById(id);
     },

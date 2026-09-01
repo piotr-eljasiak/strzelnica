@@ -34,6 +34,10 @@ export function createApp({ db, now = () => Date.now() }) {
       })),
     ],
 
+    ['GET', /^\/api\/ranges\/([\w-]+)\/embed-origins$/, (ctx, slug) =>
+      ok(service.embedOrigins(slug)),
+    ],
+
     ['POST', /^\/api\/auth\/register$/, (ctx) => {
       const shooter = service.register(ctx.body);
       return withSession(sessions.open(shooter.id), ok(presentShooter(shooter), 201));

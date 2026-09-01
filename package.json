@@ -10,7 +10,19 @@
   "scripts": {
     "test": "node --test \"test/**/*.test.js\"",
     "dev:api": "node server/http/server.js",
+    "dev:web": "vite",
+    "dev:host": "node tools/host-site.js",
+    "build": "vite build",
     "db:reset": "node server/db/reset.js",
     "db:seed": "node server/db/seed.js"
+  },
+  "dependencies": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-router-dom": "^7.18.3"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.1.1",
+    "vite": "^8.2.2"
   }
 }

@@ -46,6 +46,10 @@ export function checkBooking({
   takenSlots,
   closures,
   nowMs,
+  // What range staff may set aside when taking a booking over the phone (ADR 0009).
+  // Everything not listed here holds for everyone: a taken slot, a closure and the past
+  // are facts about the world, not policies someone is allowed to waive.
+  waive = { limits: false, schedule: false },
 }) {
   if (!Array.isArray(slots) || slots.length === 0) return refuse(REFUSAL.EMPTY);
 
@@ -69,16 +73,22 @@ export function checkBooking({
     return refuse(REFUSAL.SPANS_TWO_DAYS);
   }
 
-  const lastBookableDay = addDaysToDate(localDate(nowMs, timeZone), horizonDays);
-  if (day > lastBookableDay) {
-    return refuse(REFUSAL.BEYOND_HORIZON, { horizonDays, lastBookableDay });
+  if (!waive.limits) {
+    const lastBookableDay = addDaysToDate(localDate(nowMs, timeZone), horizonDays);
+    if (day > lastBookableDay) {
+      return refuse(REFUSAL.BEYOND_HORIZON, { horizonDays, lastBookableDay });
+    }
   }
 
-  const openHours = new Set(
-    slotsOnDate({ date: day, schedule, timeZone }).map((slot) => slot.startMs),
-  );
-  if (sorted.some((startMs) => !openHours.has(startMs))) {
-    return refuse(REFUSAL.OUTSIDE_SCHEDULE);
+  if (!waive.schedule) {
+    const openHours = new Set(
+      slotsOnDate({ date: day, schedule, timeZone }).map((slot) => slot.startMs),
+    );
+    if (sorted.some((startMs) => !openHours.has(startMs))) {
+      // Staff may override this one, so the refusal says so and the panel can offer a
+      // confirmation instead of a dead end.
+      return refuse(REFUSAL.OUTSIDE_SCHEDULE, { waivable: true });
+    }
   }
 
   const taken = new Set(takenSlots);
@@ -97,12 +107,13 @@ export function checkBooking({
   // time is gone, never why (ADR 0002).
   if (hitsClosure) return refuse(REFUSAL.SLOT_TAKEN);
 
-  if (activeBookingCount >= maxActiveBookings) {
-    return refuse(REFUSAL.TOO_MANY_ACTIVE, { maxActiveBookings });
-  }
-
-  if (slotsAlreadyBookedThatDay + sorted.length > maxSlotsPerDay) {
-    return refuse(REFUSAL.TOO_MANY_SLOTS_TODAY, { maxSlotsPerDay });
+  if (!waive.limits) {
+    if (activeBookingCount >= maxActiveBookings) {
+      return refuse(REFUSAL.TOO_MANY_ACTIVE, { maxActiveBookings });
+    }
+    if (slotsAlreadyBookedThatDay + sorted.length > maxSlotsPerDay) {
+      return refuse(REFUSAL.TOO_MANY_SLOTS_TODAY, { maxSlotsPerDay });
+    }
   }
 
   return allow();

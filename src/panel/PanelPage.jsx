@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { panelApi, refusalText } from '../api.js';
 import { fullMoment, hourIn, plural } from '../format.js';
 import { HoursEditor } from './HoursEditor.jsx';
+import { TakeBookingForm } from './TakeBookingForm.jsx';
 
 const TABS = [
   ['bookings', 'Rezerwacje'],
@@ -65,7 +66,9 @@ export function PanelPage() {
         ))}
       </div>
 
-      {tab === 'bookings' && <BookingsTab timeZone={overview.range.timeZone} />}
+      {tab === 'bookings' && (
+        <BookingsTab timeZone={overview.range.timeZone} lanes={overview.lanes} />
+      )}
       {tab === 'lanes' && <LanesTab overview={overview} reload={reload} />}
       {tab === 'hours' && <HoursTab overview={overview} reload={reload} />}
       {tab === 'closures' && <ClosuresTab overview={overview} />}
@@ -122,7 +125,7 @@ function PanelLogin({ onDone }) {
   );
 }
 
-function BookingsTab({ timeZone }) {
+function BookingsTab({ timeZone, lanes }) {
   const [bookings, setBookings] = useState(null);
   const [problem, setProblem] = useState(null);
 
@@ -133,7 +136,7 @@ function BookingsTab({ timeZone }) {
 
   async function cancel(booking) {
     const note = window.prompt(
-      `Powód anulowania rezerwacji: ${booking.shooter.name}, ${fullMoment(booking.startUtc, timeZone)}`,
+      `Powód anulowania rezerwacji: ${booking.customer.name}, ${fullMoment(booking.startUtc, timeZone)}`,
     );
     if (!note?.trim()) return;
     setProblem(null);
@@ -146,25 +149,33 @@ function BookingsTab({ timeZone }) {
   }
 
   if (!bookings) return <p className="muted">Wczytywanie…</p>;
-  if (bookings.length === 0) return <p className="muted">Brak nadchodzących rezerwacji.</p>;
 
   return (
     <>
       {problem && <div className="notice bad">{refusalText(problem)}</div>}
-      {bookings.map((booking) => (
-        <div className="card" key={booking.id}>
-          <div>
-            <strong>{fullMoment(booking.startUtc, timeZone)}</strong>
-            {booking.hours > 1 ? ` (${booking.hours} h)` : ''} — {booking.lane.name}
-            <div className="muted">
-              {booking.shooter.name} · {booking.shooter.phone} · {booking.shooter.email}
+
+      {bookings.length === 0 ? (
+        <p className="muted">Brak nadchodzących rezerwacji.</p>
+      ) : (
+        bookings.map((booking) => (
+          <div className="card" key={booking.id}>
+            <div>
+              <strong>{fullMoment(booking.startUtc, timeZone)}</strong>
+              {booking.hours > 1 ? ` (${booking.hours} h)` : ''} — {booking.lane.name}
+              <div className="muted">
+                {booking.customer.name} · {booking.customer.phone}
+                {booking.customer.email ? ` · ${booking.customer.email}` : ''}
+                {booking.takenByStaff ? ' · przyjęta przez obsługę' : ''}
+              </div>
             </div>
+            <button className="plain" onClick={() => cancel(booking)}>
+              Anuluj
+            </button>
           </div>
-          <button className="plain" onClick={() => cancel(booking)}>
-            Anuluj
-          </button>
-        </div>
-      ))}
+        ))
+      )}
+
+      <TakeBookingForm lanes={lanes} onBooked={load} />
     </>
   );
 }
@@ -364,7 +375,7 @@ function ClosuresTab({ overview }) {
             {collisions.map((booking) => (
               <li key={booking.id}>
                 {fullMoment(booking.startUtc, overview.range.timeZone)} —{' '}
-                {booking.shooter.name}, {booking.shooter.phone}
+                {booking.customer.name}, {booking.customer.phone}
               </li>
             ))}
           </ul>

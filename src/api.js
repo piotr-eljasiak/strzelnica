@@ -55,6 +55,8 @@ export const panelApi = {
   addClosure: (fields) => request('POST', '/panel/closures', fields),
   removeClosure: (id) => request('POST', `/panel/closures/${id}/delete`, {}),
   bookings: () => request('GET', '/panel/bookings'),
+  knownShooters: (q) => request('GET', `/panel/shooters?q=${encodeURIComponent(q)}`),
+  takeBooking: (fields) => request('POST', '/panel/bookings', fields),
   cancelBooking: (id, note) => request('POST', `/panel/bookings/${id}/cancel`, { note }),
 };
 

@@ -53,8 +53,9 @@ export function createRepository(db) {
     `),
     insertBooking: db.prepare(`
       INSERT INTO booking
-        (range_id, lane_id, shooter_id, start_utc, end_utc, status, created_utc)
-      VALUES (?, ?, ?, ?, ?, 'confirmed', ?)
+        (range_id, lane_id, shooter_id, guest_name, guest_phone, created_by_staff_id,
+         start_utc, end_utc, status, created_utc)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?)
     `),
     insertBookedSlot: db.prepare(
       'INSERT INTO booked_slot (lane_id, start_utc, booking_id) VALUES (?, ?, ?)',
@@ -149,7 +150,10 @@ export function createRepository(db) {
        WHERE l.range_id = ? AND c.end_utc > ?
        ORDER BY c.start_utc
     `),
-    /** Bookings of one range, with the shooter's contact details -- staff need to call. */
+    /**
+     * Bookings of one range, with the contact details staff need in order to call.
+     * The shooter is joined loosely: a booking taken over the phone has no account.
+     */
     bookingsOfRange: db.prepare(`
       SELECT b.*, l.name AS lane_name, l.distance_m,
              r.name AS range_name, r.slug AS range_slug, r.phone AS range_phone,
@@ -158,7 +162,7 @@ export function createRepository(db) {
         FROM booking b
         JOIN lane l           ON l.id = b.lane_id
         JOIN shooting_range r ON r.id = b.range_id
-        JOIN shooter s        ON s.id = b.shooter_id
+        LEFT JOIN shooter s   ON s.id = b.shooter_id
        WHERE b.range_id = ? AND b.end_utc > ?
        ORDER BY b.start_utc
     `),
@@ -167,11 +171,27 @@ export function createRepository(db) {
       SELECT b.*, l.name AS lane_name, s.first_name, s.last_name,
              s.phone AS shooter_phone, s.email AS shooter_email
         FROM booking b
-        JOIN lane l    ON l.id = b.lane_id
-        JOIN shooter s ON s.id = b.shooter_id
+        JOIN lane l         ON l.id = b.lane_id
+        LEFT JOIN shooter s ON s.id = b.shooter_id
        WHERE b.lane_id = ? AND b.status = 'confirmed'
          AND b.start_utc < ? AND b.end_utc > ?
        ORDER BY b.start_utc
+    `),
+    /**
+     * Shooters this range already knows, matched on name, e-mail or phone.
+     *
+     * Scoped to people who have booked here before -- staff must not be able to search
+     * the platform's whole user base (ADR 0009).
+     */
+    knownShooters: db.prepare(`
+      SELECT DISTINCT s.id, s.first_name, s.last_name, s.email, s.phone
+        FROM shooter s
+        JOIN booking b ON b.shooter_id = s.id
+       WHERE b.range_id = :rangeId
+         AND (s.email LIKE :q OR s.phone LIKE :q
+              OR (s.first_name || ' ' || s.last_name) LIKE :q)
+       ORDER BY s.last_name, s.first_name
+       LIMIT 20
     `),
     updateRangeSettings: db.prepare(`
       UPDATE shooting_range
@@ -231,13 +251,26 @@ export function createRepository(db) {
      * same slot between the availability check and this write, the insert fails and the
      * whole transaction rolls back.
      */
-    insertBooking({ rangeId, laneId, shooterId, slots, startUtc, endUtc, nowUtc }) {
+    insertBooking({
+      rangeId,
+      laneId,
+      shooterId = null,
+      guest = null,
+      createdByStaffId = null,
+      slots,
+      startUtc,
+      endUtc,
+      nowUtc,
+    }) {
       db.exec('BEGIN IMMEDIATE');
       try {
         const result = q.insertBooking.run(
           rangeId,
           laneId,
           shooterId,
+          guest?.name ?? null,
+          guest?.phone ?? null,
+          createdByStaffId,
           startUtc,
           endUtc,
           nowUtc,
@@ -336,6 +369,8 @@ export function createRepository(db) {
     bookingsOfRange: (rangeId, nowUtc) => q.bookingsOfRange.all(rangeId, nowUtc),
     bookingsCollidingWith: (laneId, startUtc, endUtc) =>
       q.bookingsCollidingWith.all(laneId, endUtc, startUtc),
+    knownShooters: (rangeId, term) =>
+      q.knownShooters.all({ rangeId, q: `%${term}%` }),
 
     updateRangeSettings(rangeId, settings) {
       q.updateRangeSettings.run(

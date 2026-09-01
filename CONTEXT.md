@@ -34,14 +34,20 @@ Wyłączenie osi ze sprzedaży w konkretnym czasie z powodu po stronie strzelnic
 przerwa techniczna). Zajmuje slot tak jak rezerwacja, ale nie należy do żadnego strzelca.
 _Unikaj_: wyjątek, wyłączenie, przerwa
 
+**Gość**:
+Osoba bez konta, zapisana na oś przez obsługę (telefonicznie albo przy ladzie). Znana wyłącznie
+z imienia i telefonu; nie loguje się i nie anuluje sama.
+_Unikaj_: klient bez konta, anonim, walk-in
+
 **Rezerwacja**:
-Wyłączne prawo strzelca do jednej osi w jednym lub kilku sąsiadujących slotach. Wiążąca od chwili
-złożenia — nie wymaga zatwierdzenia przez obsługę.
+Wyłączne prawo strzelca albo gościa do jednej osi w jednym lub kilku sąsiadujących slotach.
+Wiążąca od chwili złożenia — nie wymaga zatwierdzenia przez obsługę.
 _Unikaj_: booking, wizyta, termin, zapis
 
 **Strzelec**:
-Użytkownik końcowy posiadający konto, składający rezerwacje we własnym imieniu.
-_Unikaj_: klient, użytkownik, gość
+Użytkownik końcowy posiadający konto, składający rezerwacje we własnym imieniu. Kto konta
+nie ma, jest **gościem** — te dwa pojęcia nie są wymienne.
+_Unikaj_: klient, użytkownik
 
 **Obsługa**:
 Osoba działająca w imieniu strzelnicy: zarządza jej osiami, dostępnością i rezerwacjami.

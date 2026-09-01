@@ -304,8 +304,8 @@ describe('Panel — blokady i rezerwacje', () => {
   it('pokazuje obsłudze dane kontaktowe strzelca', async () => {
     const { body } = await panel.client.get('/api/panel/bookings');
 
-    assert.equal(body.bookings[0].shooter.name, 'Anna Nowak');
-    assert.equal(body.bookings[0].shooter.phone, '+48 600 300 400');
+    assert.equal(body.bookings[0].customer.name, 'Anna Nowak');
+    assert.equal(body.bookings[0].customer.phone, '+48 600 300 400');
   });
 
   it('odmawia blokady kolidującej z rezerwacją i pokazuje kogo dotyczy', async () => {
@@ -319,7 +319,7 @@ describe('Panel — blokady i rezerwacje', () => {
     assert.equal(status, 409);
     assert.equal(body.error, 'closure_collides');
     assert.equal(body.bookings.length, 1);
-    assert.equal(body.bookings[0].shooter.name, 'Anna Nowak');
+    assert.equal(body.bookings[0].customer.name, 'Anna Nowak');
   });
 
   it('po potwierdzeniu zakłada blokadę, ale NIE kasuje rezerwacji', async () => {

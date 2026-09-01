@@ -39,6 +39,15 @@ function applyMigrations(db) {
 
   for (const file of pending) {
     const sql = readFileSync(join(migrationsDir, file), 'utf8');
+
+    // SQLite cannot change a column's nullability, so altering one means rebuilding the
+    // table: copy, drop, rename. Foreign keys have to be off for that, or dropping the old
+    // table cascades into everything pointing at it. The pragma is ignored inside a
+    // transaction, hence outside. A migration opts in with a marker line so that the
+    // ordinary ones keep their protection.
+    const rebuildsTables = /^--\s*migration:\s*foreign-keys-off\s*$/m.test(sql);
+    if (rebuildsTables) db.exec('PRAGMA foreign_keys = OFF');
+
     db.exec('BEGIN');
     try {
       db.exec(sql);
@@ -49,7 +58,20 @@ function applyMigrations(db) {
       db.exec('COMMIT');
     } catch (error) {
       db.exec('ROLLBACK');
+      if (rebuildsTables) db.exec('PRAGMA foreign_keys = ON');
       throw new Error(`Migration ${file} failed: ${error.message}`, { cause: error });
+    }
+
+    if (rebuildsTables) {
+      db.exec('PRAGMA foreign_keys = ON');
+      // Turning the checks off means nothing enforced them during the rebuild; verify now
+      // rather than discovering a dangling row weeks later.
+      const dangling = db.prepare('PRAGMA foreign_key_check').all();
+      if (dangling.length > 0) {
+        throw new Error(
+          `Migration ${file} left ${dangling.length} broken foreign key reference(s)`,
+        );
+      }
     }
   }
 

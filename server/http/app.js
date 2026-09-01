@@ -154,6 +154,14 @@ export function createApp({ db, now = () => Date.now() }) {
       ok({ bookings: panel.bookings(requireStaff(ctx)) }),
     ],
 
+    ['GET', /^\/api\/panel\/shooters$/, (ctx) =>
+      ok({ shooters: panel.knownShooters(requireStaff(ctx), ctx.query.get('q')) }),
+    ],
+
+    ['POST', /^\/api\/panel\/bookings$/, (ctx) =>
+      ok({ id: panel.bookForCustomer(requireStaff(ctx), ctx.body) }, 201),
+    ],
+
     ['POST', /^\/api\/panel\/bookings\/(\d+)\/cancel$/, (ctx, id) => {
       panel.cancelBooking(requireStaff(ctx), Number(id), ctx.body.note);
       return { status: 204 };

@@ -8,6 +8,7 @@
     "node": ">=22.5.0"
   },
   "scripts": {
+    "dev": "node tools/dev.js",
     "test": "node --test \"test/**/*.test.js\"",
     "dev:api": "node server/http/server.js",
     "dev:web": "vite",

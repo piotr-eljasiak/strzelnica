@@ -1,5 +1,9 @@
 # Rezerwacja osi strzeleckiej — etap 1
 
+> Opublikowany jako [issue #1](https://github.com/piotr-eljasiak/strzelnica/issues/1)
+> z etykietą `ready-for-agent`. Ta kopia jest zapisem historycznym; bieżąca dyskusja
+> toczy się w issue.
+
 ## Problem Statement
 
 Strzelec, który chce postrzelać, nie ma jak sprawdzić, czy oś o interesującej go długości jest

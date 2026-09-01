@@ -1,18 +1,17 @@
 /**
- * Kasuje plik bazy, odtwarza schemat z migracji i zasiewa dane startowe.
- * Historia 50 ze speka: powrót do czystego stanu po eksperymentach.
+ * Deletes the database file, rebuilds the schema from the migrations and seeds it.
+ * Story 50 of the spec: getting back to a clean slate after experiments.
  */
 
 import { rmSync } from 'node:fs';
-import { otworzBaze, SCIEZKA_BAZY } from './polaczenie.js';
-import { zasiej } from './seed.js';
+import { openDatabase, DATABASE_PATH } from './connection.js';
+import { seed } from './seed.js';
 
-for (const plik of [SCIEZKA_BAZY, `${SCIEZKA_BAZY}-wal`, `${SCIEZKA_BAZY}-shm`]) {
-  rmSync(plik, { force: true });
+for (const file of [DATABASE_PATH, `${DATABASE_PATH}-wal`, `${DATABASE_PATH}-shm`]) {
+  rmSync(file, { force: true });
 }
 
-const db = otworzBaze();
-const podsumowanie = zasiej(db);
+const summary = seed(openDatabase());
 
-console.log(`Baza odtworzona: ${SCIEZKA_BAZY}`);
-console.log(podsumowanie);
+console.log(`Database rebuilt: ${DATABASE_PATH}`);
+console.log(summary);

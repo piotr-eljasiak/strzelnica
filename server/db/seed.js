@@ -1,54 +1,54 @@
 /**
- * Dane startowe etapu 1.
+ * Seed data for stage 1.
  *
- * Dwie strzelnice, nie jedna (ADR 0001): przy jednej żaden błąd izolacji najemców nie ma
- * jak się ujawnić. Różnią się też limitami, żeby było widać, że liczą się osobno.
+ * Two ranges, not one (ADR 0001): with a single range no tenant isolation bug has any way
+ * of showing itself. They also differ in their limits, so it is visible that limits are
+ * counted per range.
+ *
+ * Content is Polish because it is domain data shown to users; identifiers are English.
  */
 
-import { otworzBaze } from './polaczenie.js';
-import { zahashuj } from '../auth/hasla.js';
+import { openDatabase } from './connection.js';
+import { hashPassword } from '../auth/passwords.js';
 
-const NIEDZIELA = 0;
-const PONIEDZIALEK = 1;
-const SOBOTA = 6;
-const DNI_ROBOCZE = [1, 2, 3, 4, 5];
+const SUNDAY = 0;
+const SATURDAY = 6;
+const WEEKDAYS = [1, 2, 3, 4, 5];
 
-const HASLO_DEMO = 'strzelec123';
+const DEMO_PASSWORD = 'strzelec123';
 
-export function zasiej(db) {
-  const teraz = new Date().toISOString();
+export function seed(db) {
+  const now = new Date().toISOString();
 
-  const dodajStrzelnice = db.prepare(`
-    INSERT INTO strzelnica
-      (slug, nazwa, telefon, horyzont_dni, max_aktywnych_rezerwacji,
-       max_slotow_dziennie, okno_anulowania_godzin)
+  const insertRange = db.prepare(`
+    INSERT INTO shooting_range
+      (slug, name, phone, horizon_days, max_active_bookings,
+       max_slots_per_day, cancellation_window_hours)
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `);
-  const dodajDomene = db.prepare(
-    'INSERT INTO domena_osadzenia (strzelnica_id, domena) VALUES (?, ?)',
+  const insertOrigin = db.prepare(
+    'INSERT INTO embed_origin (range_id, origin) VALUES (?, ?)',
   );
-  const dodajGodzinyStrzelnicy = db.prepare(`
-    INSERT INTO godziny_strzelnicy (strzelnica_id, dzien_tygodnia, godzina_od, godzina_do)
-    VALUES (?, ?, ?, ?)
+  const insertRangeHours = db.prepare(`
+    INSERT INTO range_hours (range_id, weekday, start_hour, end_hour) VALUES (?, ?, ?, ?)
   `);
-  const dodajOs = db.prepare(
-    'INSERT INTO os (strzelnica_id, nazwa, dystans_m) VALUES (?, ?, ?)',
+  const insertLane = db.prepare(
+    'INSERT INTO lane (range_id, name, distance_m) VALUES (?, ?, ?)',
   );
-  const dodajGodzinyOsi = db.prepare(`
-    INSERT INTO godziny_osi (os_id, dzien_tygodnia, godzina_od, godzina_do)
-    VALUES (?, ?, ?, ?)
+  const insertLaneHours = db.prepare(`
+    INSERT INTO lane_hours (lane_id, weekday, start_hour, end_hour) VALUES (?, ?, ?, ?)
   `);
-  const dodajBlokade = db.prepare(
-    'INSERT INTO blokada (os_id, poczatek_utc, koniec_utc, powod) VALUES (?, ?, ?, ?)',
+  const insertClosure = db.prepare(
+    'INSERT INTO closure (lane_id, start_utc, end_utc, reason) VALUES (?, ?, ?, ?)',
   );
-  const dodajStrzelca = db.prepare(`
-    INSERT INTO strzelec (email, hash_hasla, imie, nazwisko, telefon, utworzony_utc)
+  const insertShooter = db.prepare(`
+    INSERT INTO shooter (email, password_hash, first_name, last_name, phone, created_utc)
     VALUES (?, ?, ?, ?, ?, ?)
   `);
 
-  // --- Strzelnica 1: standardowe limity, oś 100 m czynna krócej niż reszta obiektu ---
+  // --- Range 1: standard limits, the 100 m lane open fewer hours than the site ---
 
-  const tarczownia = dodajStrzelnice.run(
+  const tarczownia = insertRange.run(
     'tarczownia',
     'Strzelnica Tarczownia',
     '+48 58 111 22 33',
@@ -58,23 +58,23 @@ export function zasiej(db) {
     24,
   ).lastInsertRowid;
 
-  dodajDomene.run(tarczownia, 'http://localhost:5174');
+  insertOrigin.run(tarczownia, 'http://localhost:5174');
 
-  for (const dzien of DNI_ROBOCZE) dodajGodzinyStrzelnicy.run(tarczownia, dzien, 9, 20);
-  dodajGodzinyStrzelnicy.run(tarczownia, SOBOTA, 9, 16);
-  // Brak wiersza dla niedzieli = obiekt zamknięty.
+  for (const weekday of WEEKDAYS) insertRangeHours.run(tarczownia, weekday, 9, 20);
+  insertRangeHours.run(tarczownia, SATURDAY, 9, 16);
+  // No row for Sunday: the site is closed.
 
-  const tarczowniaOs25 = dodajOs.run(tarczownia, 'Oś 25 m', 25).lastInsertRowid;
-  const tarczowniaOs100 = dodajOs.run(tarczownia, 'Oś 100 m', 100).lastInsertRowid;
+  insertLane.run(tarczownia, 'Oś 25 m', 25);
+  const tarczowniaLane100 = insertLane.run(tarczownia, 'Oś 100 m', 100).lastInsertRowid;
 
-  // Oś 25 m nie ma własnego grafiku — dziedziczy godziny strzelnicy.
-  // Oś 100 m ma własny, krótszy: hałas i warunki.
-  for (const dzien of DNI_ROBOCZE) dodajGodzinyOsi.run(tarczowniaOs100, dzien, 10, 18);
-  dodajGodzinyOsi.run(tarczowniaOs100, SOBOTA, 10, 14);
+  // The 25 m lane has no schedule of its own, so it inherits the range's hours.
+  // The 100 m lane has its own, shorter one: noise and conditions.
+  for (const weekday of WEEKDAYS) insertLaneHours.run(tarczowniaLane100, weekday, 10, 18);
+  insertLaneHours.run(tarczowniaLane100, SATURDAY, 10, 14);
 
-  // --- Strzelnica 2: inne limity i inny tydzień, żeby izolacja była widoczna ---
+  // --- Range 2: different limits and a different week, so isolation is visible ---
 
-  const bemowo = dodajStrzelnice.run(
+  const bemowo = insertRange.run(
     'bemowo',
     'Strzelnica Bemowo',
     '+48 22 444 55 66',
@@ -84,51 +84,54 @@ export function zasiej(db) {
     24,
   ).lastInsertRowid;
 
-  dodajDomene.run(bemowo, 'http://localhost:5174');
+  insertOrigin.run(bemowo, 'http://localhost:5174');
 
-  for (let dzien = NIEDZIELA; dzien <= SOBOTA; dzien += 1) {
-    dodajGodzinyStrzelnicy.run(bemowo, dzien, 8, 22);
+  for (let weekday = SUNDAY; weekday <= SATURDAY; weekday += 1) {
+    insertRangeHours.run(bemowo, weekday, 8, 22);
   }
 
-  dodajOs.run(bemowo, 'Oś 25 m', 25);
-  const bemowoOs50 = dodajOs.run(bemowo, 'Oś 50 m', 50).lastInsertRowid;
+  insertLane.run(bemowo, 'Oś 25 m', 25);
+  const bemowoLane50 = insertLane.run(bemowo, 'Oś 50 m', 50).lastInsertRowid;
 
-  // --- Blokada: zawody na osi 50 m w najbliższą sobotę ---
+  // --- A closure: a club competition on the 50 m lane this coming Saturday ---
 
-  const sobota = najblizszyDzienTygodnia(SOBOTA);
-  dodajBlokade.run(
-    bemowoOs50,
-    `${sobota}T08:00:00Z`,
-    `${sobota}T14:00:00Z`,
+  const saturday = nextWeekday(SATURDAY);
+  insertClosure.run(
+    bemowoLane50,
+    `${saturday}T08:00:00Z`,
+    `${saturday}T14:00:00Z`,
     'Zawody klubowe',
   );
 
-  // --- Konto demonstracyjne ---
+  // --- Demo account ---
 
-  const hash = zahashuj(HASLO_DEMO);
-  dodajStrzelca.run('strzelec@example.com', hash, 'Jan', 'Kowalski', '+48 600 100 200', teraz);
+  insertShooter.run(
+    'strzelec@example.com',
+    hashPassword(DEMO_PASSWORD),
+    'Jan',
+    'Kowalski',
+    '+48 600 100 200',
+    now,
+  );
 
   return {
-    strzelnice: ['tarczownia', 'bemowo'],
-    osie: 4,
-    strzelecDemo: { email: 'strzelec@example.com', haslo: HASLO_DEMO },
-    blokada: `Oś 50 m (Bemowo), ${sobota} 08:00–14:00 UTC`,
-    dziedziczenie: `Oś 25 m (Tarczownia) dziedziczy godziny strzelnicy; Oś 100 m ma własny grafik`,
-    tarczowniaOs25,
+    ranges: ['tarczownia', 'bemowo'],
+    lanes: 4,
+    demoShooter: { email: 'strzelec@example.com', password: DEMO_PASSWORD },
+    closure: `Oś 50 m (Bemowo), ${saturday} 08:00-14:00 UTC`,
+    inheritance: 'Oś 25 m (Tarczownia) inherits range hours; Oś 100 m has its own schedule',
   };
 }
 
-function najblizszyDzienTygodnia(dzienTygodnia) {
-  const data = new Date();
-  data.setUTCHours(0, 0, 0, 0);
-  const doPrzodu = (dzienTygodnia - data.getUTCDay() + 7) % 7 || 7;
-  data.setUTCDate(data.getUTCDate() + doPrzodu);
-  return data.toISOString().slice(0, 10);
+function nextWeekday(weekday) {
+  const date = new Date();
+  date.setUTCHours(0, 0, 0, 0);
+  const ahead = (weekday - date.getUTCDay() + 7) % 7 || 7;
+  date.setUTCDate(date.getUTCDate() + ahead);
+  return date.toISOString().slice(0, 10);
 }
 
 if (import.meta.url === `file://${process.argv[1].replace(/\\/g, '/')}`) {
-  const db = otworzBaze();
-  const podsumowanie = zasiej(db);
-  console.log('Dane startowe zapisane:');
-  console.log(podsumowanie);
+  console.log('Seed data written:');
+  console.log(seed(openDatabase()));
 }

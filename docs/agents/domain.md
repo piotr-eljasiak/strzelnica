@@ -4,7 +4,9 @@ How the engineering skills should consume this repo's domain documentation when 
 
 **This repo is single-context.** The glossary is `CONTEXT.md` at the root and decisions live in `docs/adr/`. There is no `CONTEXT-MAP.md` and no per-package contexts; the multi-context layout below is documented only so the convention is clear if the repo ever grows into one.
 
-The glossary is written in Polish, because the domain (strzelnica, oś strzelecka, slot, blokada) is Polish. Code and identifiers are English. When naming a domain concept in an issue title, test name, or proposal, use the Polish term from `CONTEXT.md` rather than an English paraphrase.
+The glossary is written in Polish, because the domain (strzelnica, oś strzelecka, slot, blokada) is Polish. Code, identifiers and code comments are English, and `docs/adr/0007-angielskie-nazwy-w-kodzie.md` holds the mapping between the two — **read it before naming anything**.
+
+In prose (issue titles, spec text, discussion) use the Polish glossary term. In code use the English identifier from ADR 0007's table. Inventing a third name for a concept that already has both — `axis`, `position`, `slot_reservation` — is the drift both documents exist to prevent.
 
 ## Before exploring, read these
 

@@ -8,6 +8,8 @@
     "node": ">=22.5.0"
   },
   "scripts": {
+    "test": "node --test \"test/**/*.test.js\"",
+    "dev:api": "node server/http/server.js",
     "db:reset": "node server/db/reset.js",
     "db:seed": "node server/db/seed.js"
   }

@@ -1,0 +1,14 @@
+{
+  "name": "strzelnica",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Platforma rezerwacji osi strzeleckich",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "db:reset": "node server/db/reset.js",
+    "db:seed": "node server/db/seed.js"
+  }
+}

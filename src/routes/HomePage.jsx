@@ -39,6 +39,10 @@ export function HomePage() {
         Widget osadzony na prawdziwej stronie strzelnicy zobaczysz pod adresem{' '}
         <a href="http://localhost:5174">http://localhost:5174</a> — tam zaczyna klient.
       </p>
+
+      <p className="muted">
+        Prowadzisz strzelnicę? <Link to="/panel">Panel obsługi</Link>.
+      </p>
     </div>
   );
 }
